@@ -157,9 +157,9 @@ INSERT INTO dbo.Payments (enrolment_id, amount, payment_method, payment_status, 
 (4, 200.00, 'Cash', 'Pending', NULL);
 GO
 
--- SELECT * FROM dbo.Users;
--- SELECT * FROM dbo.Events;
--- SELECT * FROM dbo.Categories;
--- SELECT * FROM dbo.Enrolments;
--- SELECT * FROM dbo.Results;
--- SELECT * FROM dbo.Payments;
+SELECT * FROM dbo.Users;
+SELECT * FROM dbo.Events;
+SELECT * FROM dbo.Categories;
+SELECT * FROM dbo.Enrolments;
+SELECT * FROM dbo.Results;
+SELECT * FROM dbo.Payments;
