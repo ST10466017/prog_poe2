@@ -1,36 +1,122 @@
-# This is a basic workflow to help you get started with Actions
+name: Validate Repository Structure
 
-name: CI
-
-# Controls when the workflow will run
+# Checks the repo layout required by the brief on every push and pull request.
+# Hard requirements fail the build; things you can only add AFTER a green build
+# (CI screenshot, YouTube link) or that are style goals (20+ commits) only warn.
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "main" ]
+    branches: [ "**" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "**" ]
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  validate-structure:
     runs-on: ubuntu-latest
+    name: Check docs, README and Part 2 structure
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - name: Checkout repository (full history for commit count)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      # ---------------- Part 1: /docs ----------------
+      - name: Check docs folder exists
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          if [ ! -d "docs" ]; then
+            echo "::error::Missing required 'docs' folder at repository root."
+            exit 1
+          fi
+          echo "docs folder found."
+
+      - name: Check ERD image (PNG or PDF)
+        run: |
+          if ! ls docs/*.png docs/*.PNG docs/*.pdf docs/*.PDF >/dev/null 2>&1; then
+            echo "::error::No ERD file (.png or .pdf) found in /docs."
+            exit 1
+          fi
+          echo "ERD found."
+
+      - name: Check API endpoint plan (Markdown or PDF)
+        run: |
+          if ! ls docs/*Endpoint*.md docs/*endpoint*.md docs/*Endpoint*.pdf docs/*endpoint*.pdf >/dev/null 2>&1; then
+            echo "::error::No endpoint plan (name containing 'endpoint', .md or .pdf) found in /docs."
+            exit 1
+          fi
+          echo "Endpoint plan found."
+
+      - name: Check SQL script
+        run: |
+          if ! ls docs/*.sql docs/*.SQL >/dev/null 2>&1; then
+            echo "::error::No SQL script (.sql) found in /docs."
+            exit 1
+          fi
+          echo "SQL script found."
+
+      # ---------------- Part 2: API project ----------------
+      - name: Check Part 2 solution, API project and test project
+        run: |
+          missing=0
+          for f in Part2-API/RaceDay.sln \
+                   Part2-API/src/RaceDay.Api/RaceDay.Api.csproj \
+                   Part2-API/src/RaceDay.Api/Program.cs \
+                   Part2-API/tests/RaceDay.Api.Tests/RaceDay.Api.Tests.csproj; do
+            if [ ! -f "$f" ]; then echo "::error::Missing $f"; missing=1; fi
+          done
+          if ls Part2-API/tests/RaceDay.Api.Tests/*Tests.cs >/dev/null 2>&1; then
+            echo "Test files found."
+          else
+            echo "::error::No unit test files (*Tests.cs) found in Part2-API/tests."; missing=1
+          fi
+          exit $missing
+
+      - name: Check Swagger is wired up
+        run: |
+          if ! grep -q "AddSwaggerGen" Part2-API/src/RaceDay.Api/Program.cs; then
+            echo "::error::Swagger (AddSwaggerGen) not found in Program.cs."
+            exit 1
+          fi
+          echo "Swagger configured."
+
+      - name: Check EF Core migrations (code-first)
+        run: |
+          if ls Part2-API/src/RaceDay.Api/Migrations/*.cs >/dev/null 2>&1; then
+            echo "Migrations found."
+          else
+            echo "::warning::No EF Core migrations found. Run 'dotnet ef migrations add InitialCreate' and commit the Migrations folder (code-first requirement)."
+          fi
+
+      # ---------------- README ----------------
+      - name: Check README exists and describes the two roles
+        run: |
+          if [ ! -f "README.md" ]; then
+            echo "::error::Missing README.md at repository root."
+            exit 1
+          fi
+          if ! (grep -qi "organiser" README.md && grep -qi "participant" README.md); then
+            echo "::error::README must describe the two roles (Organiser and Participant)."
+            exit 1
+          fi
+          echo "README and roles description found."
+
+      - name: README - CI/CD screenshot and YouTube link (warnings only)
+        run: |
+          if ! grep -E '!\[|<img' README.md | grep -qv 'badge.svg'; then
+            echo "::warning::README has no CI/CD green-build screenshot yet."
+          fi
+          if ! grep -Eqi 'youtu(\.be|be\.com)/' README.md; then
+            echo "::warning::README has no YouTube video link yet."
+          fi
+          echo "README checks done."
+
+      # ---------------- Commit history ----------------
+      - name: Check commit count (warning only)
+        run: |
+          count=$(git rev-list --count HEAD)
+          echo "Commits so far: $count"
+          if [ "$count" -lt 20 ]; then
+            echo "::warning::Only $count commits - the brief asks for at least 20 meaningful commits per part."
+          fi
+
+      - name: All required checks passed
+        run: echo "Repository structure is valid ✅"
