@@ -1,0 +1,37 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "RaceDay_StrongPass123!"
+    ports: ["1433:1433"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'RaceDay_StrongPass123!' -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    command: azurite-blob --blobHost 0.0.0.0
+    ports: ["10000:10000"]
+  api:
+    build:
+      context: .
+      dockerfile: Part2-API/src/RaceDay.Api/Dockerfile
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=sqlserver;Database=RaceDayDB;User Id=sa;Password=RaceDay_StrongPass123!;TrustServerCertificate=True"
+      AzureBlobStorage__ConnectionString: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUz4c5J5j6e0X4sR2wQ7qVw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      AzureBlobStorage__Container: "event-banners"
+      AzureBlobStorage__ProfileContainer: "profile-pictures"
+    depends_on:
+      sqlserver: { condition: service_healthy }
+      azurite: { condition: service_started }
+    ports: ["5080:8080"]
+  mvc:
+    build:
+      context: .
+      dockerfile: Part3-MVC/Dockerfile
+    environment:
+      Api__BaseUrl: "http://api:8080/"
+    depends_on: [api]
+    ports: ["8080:8080"]

@@ -1,0 +1,9 @@
+global using System.Security.Claims;
+global using Microsoft.AspNetCore.Authorization;
+global using Microsoft.AspNetCore.Mvc;
+global using Microsoft.AspNetCore.Mvc.ModelBinding;
+global using Microsoft.EntityFrameworkCore;
+global using RaceDay.Api.Auth;
+global using RaceDay.Api.Data;
+global using RaceDay.Api.Extensions;
+global using RaceDay.Api.Models;

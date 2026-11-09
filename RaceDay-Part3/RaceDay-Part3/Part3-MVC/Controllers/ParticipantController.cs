@@ -1,0 +1,10 @@
+using Microsoft.AspNetCore.Authorization;using Microsoft.AspNetCore.Mvc;using RaceDay.Mvc.Models;using RaceDay.Mvc.Services;
+namespace RaceDay.Mvc.Controllers;
+[Authorize(Roles="Participant")]
+public class ParticipantController(RaceDayApiClient api):Controller{
+ public async Task<IActionResult> Index(){try{ViewBag.Results=await api.Get<List<ResultDto>>("api/users/me/results")??new();return View(await api.Get<List<EnrolmentDto>>("api/users/me/enrolments")??new());}catch(ApiException e){TempData["Error"]=e.Message;return View(new List<EnrolmentDto>());}}
+ [HttpPost][ValidateAntiForgeryToken]public async Task<IActionResult> Enrol(int categoryId,string paymentMethod="EFT"){try{await api.Post<EnrolmentDto>($"api/categories/{categoryId}/enrol",new{PaymentMethod=paymentMethod});TempData["Success"]="You are enrolled!";}catch(ApiException e){TempData["Error"]=e.Message;}return RedirectToAction("Index","Home");}
+ [HttpPost][ValidateAntiForgeryToken]public async Task<IActionResult> Cancel(int id){try{await api.Delete<object>($"api/enrolments/{id}");TempData["Success"]="Enrolment cancelled.";}catch(ApiException e){TempData["Error"]=e.Message;}return RedirectToAction("Index");}
+ [HttpGet]public async Task<IActionResult> Profile(){try{var p=await api.Get<UserDto>("api/users/me");return View(new ProfileVm{FullName=p?.FullName??"",Phone=p?.Phone,CurrentImageUrl=p?.ProfileImageUrl});}catch(ApiException e){TempData["Error"]=e.Message;return RedirectToAction("Index");}}
+ [HttpPost][ValidateAntiForgeryToken]public async Task<IActionResult> Profile(ProfileVm vm){if(!ModelState.IsValid)return View(vm);try{await api.Put<UserDto>("api/users/me",new{vm.FullName,vm.Phone});if(vm.ProfilePicture!=null)await api.Upload<object>("api/users/me/profile-picture",vm.ProfilePicture);TempData["Success"]="Profile updated.";return RedirectToAction("Profile");}catch(ApiException e){ModelState.AddModelError("",e.Message);return View(vm);}}
+}

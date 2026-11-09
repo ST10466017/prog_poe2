@@ -1,0 +1,11 @@
+using System.Security.Claims;using Microsoft.AspNetCore.Authentication;using Microsoft.AspNetCore.Authentication.Cookies;using Microsoft.AspNetCore.Mvc;using RaceDay.Mvc.Models;using RaceDay.Mvc.Services;
+namespace RaceDay.Mvc.Controllers;
+public class AccountController(RaceDayApiClient api):Controller{
+ [HttpGet]public IActionResult Login()=>View(new LoginVm());
+ [HttpPost] [ValidateAntiForgeryToken] public async Task<IActionResult> Login(LoginVm vm){if(!ModelState.IsValid)return View(vm);try{var (user,cookie)=await api.Login<UserDto>("api/auth/login",vm);if(user is null||cookie is null)throw new ApiException(500,"The API did not return a session cookie.");HttpContext.Session.SetString("ApiCookie",cookie);await SignIn(user);return RedirectToAction("Index","Home");}catch(ApiException e){ModelState.AddModelError("",e.Message);return View(vm);}}
+ [HttpGet]public IActionResult Register()=>View(new RegisterVm());
+ [HttpPost][ValidateAntiForgeryToken]public async Task<IActionResult> Register(RegisterVm vm){if(!ModelState.IsValid)return View(vm);try{await api.Post<UserDto>("api/auth/register",vm);TempData["Success"]="Account created. Please sign in.";return RedirectToAction("Login");}catch(ApiException e){ModelState.AddModelError("",e.Message);return View(vm);}}
+ private async Task SignIn(UserDto u){var claims=new[]{new Claim(ClaimTypes.NameIdentifier,u.UserId.ToString()),new Claim(ClaimTypes.Name,u.FullName),new Claim(ClaimTypes.Email,u.Email),new Claim(ClaimTypes.Role,u.Role)};await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,new ClaimsPrincipal(new ClaimsIdentity(claims,CookieAuthenticationDefaults.AuthenticationScheme)),new AuthenticationProperties{IsPersistent=true,ExpiresUtc=DateTimeOffset.UtcNow.AddMinutes(30)});}
+ [HttpPost][ValidateAntiForgeryToken]public async Task<IActionResult> Logout(){try{await api.Post<object>("api/auth/logout",new{});}catch{}HttpContext.Session.Remove("ApiCookie");await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);return RedirectToAction("Index","Home");}
+ public IActionResult Denied()=>View();
+}
